@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Key Generator - Fake GPS Pro (30 Hari)</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body {
+      margin: 0; min-height: 100vh; background: #0f172a; color: #f8fafc;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .card {
+      width: 100%; max-width: 440px; background: #1e293b; border: 1px solid #334155;
+      border-radius: 20px; padding: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .badge {
+      display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 4px 10px;
+      border-radius: 99px; margin-bottom: 10px;
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 0 0 20px; font-size: 13px; color: #94a3b8; line-height: 1.5; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    input {
+      width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid #334155;
+      background: #0f172a; color: #f8fafc; font-size: 14px; outline: none; margin-bottom: 16px;
+    }
+    input:focus { border-color: #38bdf8; }
+    button {
+      width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px;
+      font-weight: 700; cursor: pointer; background: #38bdf8; color: #0f172a; transition: 0.2s;
+    }
+    button:hover { background: #7dd3fc; }
+    .result-box {
+      display: none; margin-top: 20px; padding: 16px; background: #0f172a;
+      border: 1px solid #10b981; border-radius: 14px;
+    }
+    .key-text {
+      font-family: monospace; font-size: 16px; font-weight: 700; color: #10b981;
+      word-break: break-all; margin: 8px 0;
+    }
+    .meta { font-size: 12px; color: #94a3b8; }
+    .copy-btn {
+      margin-top: 12px; background: #10b981; color: #0f172a; padding: 10px; font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">LICENSE KEY GENERATOR • PROTECTED</span>
+    <h1>Aktivasi 30 Hari</h1>
+    <p>1 License Key hanya berlaku untuk <b>1 Username (USN)</b> dan otomatis kedaluwarsa setelah <b>30 hari</b>.</p>
+
+    <label for="adminPinInput">Admin PIN (Khusus Pemilik)</label>
+    <input type="password" id="adminPinInput" placeholder="Masukkan Admin PIN" autocomplete="off" />
+
+    <label for="usnInput">Masukkan Username (USN)</label>
+    <input type="text" id="usnInput" placeholder="Contoh: azka_pro" autocomplete="off" />
+
+    <button onclick="generateKey()">Generate Random Key (30 Hari)</button>
+
+    <div class="result-box" id="resultBox">
+      <div class="meta">License Key untuk <b id="outUsn"></b>:</div>
+      <div class="key-text" id="outKey"></div>
+      <div class="meta" id="outExp"></div>
+      <button class="copy-btn" onclick="copyKey()">Salin Key</button>
+    </div>
+  </div>
+
+  <script>
+    const SECRET_SALT = "FGP_612A7ED1835E54ED5FA9070CC0A7CF504598306805EA5FF5";
+    const ADMIN_PIN_HASH = "352573c48421b86b729f539b08d42c783b40e5ee6e63dc0d440c378441c18301";
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+    async function sha256Hex(text) {
+      const enc = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", enc.encode(text));
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    async function computeHmacHex(secret, message) {
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+      );
+      const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+      return Array.from(new Uint8Array(sig))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("")
+        .toUpperCase();
+    }
+
+    function randomNonce(length = 4) {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const arr = new Uint8Array(length);
+      crypto.getRandomValues(arr);
+      return Array.from(arr, x => chars[x % chars.length]).join("");
+    }
+
+    async function generateKey() {
+      const pin = document.getElementById("adminPinInput").value.trim();
+      const pinHash = await sha256Hex(pin);
+      if (pinHash !== ADMIN_PIN_HASH) {
+        alert("Admin PIN salah! Hanya pemilik yang dapat membuat License Key.");
+        return;
+      }
+
+      const rawUsn = document.getElementById("usnInput").value.trim().toLowerCase();
+      if (rawUsn.length < 3) {
+        alert("Username minimal 3 karakter!");
+        return;
+      }
+
+      const expiryMs = Date.now() + THIRTY_DAYS_MS;
+      const expiryBase36 = expiryMs.toString(36).toUpperCase();
+      const nonce = randomNonce(4);
+      const payload = `${rawUsn}|${expiryBase36}|${nonce}`;
+      const fullSig = await computeHmacHex(SECRET_SALT, payload);
+      const shortSig = fullSig.slice(0, 8);
+
+      const finalKey = `FGP-${expiryBase36}-${nonce}-${shortSig}`;
+      const expDate = new Date(expiryMs).toLocaleString("id-ID", {
+        dateStyle: "medium", timeStyle: "short"
+      });
+
+      document.getElementById("outUsn").textContent = rawUsn;
+      document.getElementById("outKey").textContent = finalKey;
+      document.getElementById("outExp").textContent = `Berlaku hingga: ${expDate} (30 Hari)`;
+      document.getElementById("resultBox").style.display = "block";
+    }
+
+    function copyKey() {
+      const keyVal = document.getElementById("outKey").textContent;
+      navigator.clipboard.writeText(keyVal);
+      alert("Key berhasil disalin: " + keyVal);
+    }
+  </script>
+</body>
+</html>
